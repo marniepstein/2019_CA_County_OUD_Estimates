@@ -1,0 +1,440 @@
+---
+header-includes:
+- \input{preamble.tex}
+fontsize: 10pt
+output: pdf_document
+sansfont: Lato
+font:     Lato
+geometry: "left=0.9in,right=0.9in,top=0.35in,bottom=0.6in"
+urlcolor: #169d62
+params:
+  county: "Alpine"
+---
+
+\raggedright
+
+```{r rmarkdown-setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(strip.white = TRUE)
+knitr::opts_chunk$set(dev = "cairo_pdf")
+options(knitr.kable.NA = "")
+
+```
+
+```{r data, results="hide"}
+
+#location of Lato font (MAC)
+Sys.setenv(R_GSCMD="/Library/Fonts")
+
+#Run once per machine
+#install.packages(c("tinytex", "rmarkdown"))
+#tinytex::install_tinytex()
+
+library(tinytex)
+library(tidyverse)
+library(knitr)
+library(rmarkdown)
+library(formattable)
+#library(plyr)
+library(dplyr)
+library(ggrepel)
+library(extrafont)
+#extrafont::loadfonts(quiet=TRUE)
+
+library(urbnthemes)
+set_urbn_defaults(style = "print")
+
+# Read in file from directory
+data <- read_csv("Output 2.csv")
+
+#Urban PC
+#data <- read_csv("D:/Users/mepstein/Box/2019 OUD CHCF County Estimates/3b Analysis 2019 Update/Output/first run - All final variables - varnames - OUD without dependence.csv")
+
+countydata <- data %>%
+  filter(county == params$county) %>%
+  replace_na(list(perc_waiver = 0, death_count = 0))
+
+  
+#Format variables to show commas and round
+countydata <- countydata %>%
+  mutate(buprx_count = comma(buprx_count, digits = 0)) %>%
+  mutate(buprx_cdrate = comma(buprx_cdrate, digits = 1)) %>%
+  mutate(death_count = comma(death_count, digits = 0)) %>%
+  mutate(death_cdrate = comma(death_cdrate, digits = 1)) %>%
+  mutate(OTPcount = comma(OTPcount, digits = 0)) %>%
+  mutate(OTP_rate = comma(OTP_rate, digits = 1)) %>%
+  mutate(Totalslots = comma(Totalslots, digits = 0)) %>%
+  mutate(Totalslots_rate = comma(Totalslots_rate, digits = 1)) %>%
+  mutate(NTISwaiver30= comma(NTISwaiver30, digits = 0)) %>%
+  mutate(NTISwaiver100 = comma(NTISwaiver100, digits = 0)) %>%
+  mutate(NTISwaiver275 = comma(NTISwaiver275, digits = 0)) %>%
+  mutate(newwaiver30 = comma(newwaiver30, digits = 0)) %>%
+  mutate(newwaiver30 = ifelse(newwaiver30 > 0, paste0("+", newwaiver30), newwaiver30)) %>%
+  mutate(newwaiver30 = ifelse(newwaiver30 == 0, "no change", newwaiver30)) %>%
+  mutate(newwaiver100 = comma(newwaiver100, digits = 0)) %>%
+  mutate(newwaiver100 = ifelse(newwaiver100 > 0, paste0("+", newwaiver100), newwaiver100)) %>%
+  mutate(newwaiver100 = ifelse(newwaiver100 == 0, "no change", newwaiver100)) %>%
+  mutate(newwaiver275 = comma(newwaiver275, digits = 0)) %>%
+  mutate(newwaiver275 = ifelse(newwaiver275 > 0, paste0("+", newwaiver275), newwaiver275)) %>%
+  mutate(newwaiver275 = ifelse(newwaiver275 == 0, "no change", newwaiver275)) %>%
+  mutate(newOUDcount = comma(newOUDcount, digits = 0)) %>%
+  mutate(newOUDrate = comma(newOUDrate, digits = 2)) %>%
+  mutate(OUDmisuse_count = comma(OUDmisuse_count, digits = 0)) %>%
+  mutate(OUDmisuse_rate = comma(OUDmisuse_rate, digits = 1)) %>%
+  mutate(treatgap_cap3 = comma(treatgap_cap3, digits = 0)) %>%
+  mutate(curtreatgap_all = comma(curtreatgap_all, digits = 0)) %>%
+  mutate(treatcap3 = comma(treatcap3, digits = 0)) %>%
+  mutate(perc_gapfilled3 = comma(perc_gapfilled3, digits = 1)) %>%
+  mutate(perc_gapfilled_curtreat = comma(perc_gapfilled_curtreat, digits = 1)) %>%
+  mutate(newprov_capped3 = comma(newprov_capped3, digits = 0)) %>%
+  mutate(newprov_cappedcurtreat = comma(newprov_cappedcurtreat, digits = 0)) %>%
+  mutate(perc_waiver = comma(perc_waiver, digits = 1)) %>%
+  mutate(allprx_byprxcounty = comma(allprx_byprxcounty, digits = 0)) %>%
+  mutate(totalprescribers = comma(totalprescribers, digits = 0)) %>%
+  mutate(totbuppat_bypatcty = comma(totbuppat_bypatcty, digits = 0)) %>%
+  mutate(buppatincty_bypatcty = comma(buppatincty_bypatcty, digits = 0)) %>%
+  mutate(county = ifelse(county == "LA SPA 8", "Service Planning Area 8", county)) %>%
+  mutate(county = ifelse(county == "LA SPA 7", "Service Planning Area 7", county)) %>%
+  mutate(county = ifelse(county == "LA SPA 6", "Service Planning Area 6", county)) %>%
+  mutate(county = ifelse(county == "LA SPA 4", "Service Planning Area 4", county)) %>%
+  mutate(county = ifelse(county == "LA SPA 3", "Service Planning Area 3", county)) %>%
+  mutate(county = ifelse(county == "LA SPA 2", "Service Planning Area 2", county)) %>%
+  mutate(county = ifelse(county == "LA SPA 1 and 5", "Service Planning Areas 1 and 5", county)) 
+  
+#Create strings for ranges that change based on whether both values are the same 
+countydata <- countydata %>%
+#IF DASHBOARD MEASURES ARE 0, DON'T DISPLAY RATE
+  mutate(bup1 = ifelse(buprx_count == 0, "", ";")) %>%
+  mutate(bup2 = ifelse(buprx_count == 0, "", as.character(buprx_cdrate))) %>%
+  mutate(bup3 = ifelse(buprx_count == 0, "", " per 1,000 people 12+")) %>%
+  mutate(deathsingular = ifelse(death_count == 1, "death", "deaths")) %>%
+  mutate(death1 = ifelse(death_count == 0, "", "; ")) %>%
+  mutate(death2 = ifelse(death_count == 0, "", as.character(death_cdrate))) %>%
+  mutate(death3 = ifelse(death_count == 0, "", " per 100,000 people 12+")) %>%
+  mutate(OTPsingular = ifelse(OTPcount == 1, "opioid treatment program (OTP)", "opioid treatment programs (OTPs)")) %>%
+  mutate(OTP1 = ifelse(OTPcount == 0, "", " with ")) %>%
+  mutate(OTP2 = ifelse(OTPcount == 0, "", as.character(Totalslots))) %>%
+  mutate(OTP3 = ifelse(OTPcount == 0, "", " methadone slots; ")) %>%   
+  mutate(OTP4 = ifelse(OTPcount == 0, "", Totalslots_rate)) %>%
+  mutate(OTP5 = ifelse(OTPcount == 0, "", " slots per 100,000 people 12+")) %>%   
+#IF THERE ARE NO PRESCRIBERS IN THE COUNTY
+  mutate(singular30 = ifelse(NTISwaiver30 == 1, "prescriber", "prescribers")) %>%
+  mutate(singular100 = ifelse(NTISwaiver100 == 1, "prescriber", "prescribers")) %>%
+  mutate(singular275 = ifelse(NTISwaiver275 == 1, "prescriber", "prescribers")) %>%
+  mutate(singularOOC = ifelse(prov_outofcounty == 1, "prescriber", "prescribers"))
+
+#HOW MANY NEW PRESCRIBERS
+#Note: there are no counties where the capped # prescribers = cap AND that fills the treatment gap by 100%
+countydata <- countydata %>%
+  #LOWER BOUND - newprov_cappedcurtreat
+  mutate(plural_lb = ifelse(newprov_cappedcurtreat==1, "prescriber", "prescribers")) %>%
+  #if lower bound is 0, if lower bound is not capped (aka less than the cap), if lower bound is capped
+  mutate(lb_1 = ifelse(newprov_cappedcurtreat == 0,
+                                "There is no treatment gap in the county based on estimates of the number of patients with opioid use disorder and current treatment.", "Adding ")) %>%
+  mutate(lb_2 = ifelse(newprov_cappedcurtreat == 0, "", newprov_cappedcurtreat)) %>%
+  mutate(lb_3 = ifelse(newprov_cappedcurtreat == 0, "", ifelse(perc_gapfilled_curtreat == 100, paste(" new waivered ", as.character(plural_lb), " fills the current treatment gap of ", curtreatgap_all, " people, if new prescribers treat 16 patients on average."),
+                                                                    paste(" new waivered ", as.character(plural_lb), "would double the county’s waivered prescribers and fill ")))) %>%
+  mutate(lb_4 = ifelse(perc_gapfilled_curtreat != 100, paste0(as.character(perc_gapfilled_curtreat), "\\%"), "")) %>%
+  mutate(lb_5 = ifelse(perc_gapfilled_curtreat != 100, paste(" of the current treatment gap of ", curtreatgap_all, " people, if new prescribers treat 16 patients on average."), "")) %>%
+  #
+  #
+  #UPPER BOUND - newprov_capped3
+    mutate(plural_ub = ifelse(newprov_capped3==1, "prescriber", "prescribers")) %>%
+  #if upper bound is 0, if upper bound is not capped (aka less than the cap), if upper bound is capped
+  mutate(ub_1 = ifelse(newprov_capped3 == 0,
+                                "There is no projected treatment gap if existing prescribers treat more patients; for example, if current waivered prescribers with a 30-patient limit treat 30 patients each and/or current prescribers with higher waivers treat half their waiver limit.", 
+                       ifelse(perc_gapfilled3 == 100, "Fewer prescribers are needed if each prescriber treats more patients. If current waivered prescribers increase their number of patients so that those with a 30-patient limit treat 30 patients each and those with higher waivers treat half their waiver limit, adding ",
+                              "More of the treatment gap is filled if each prescriber treats more patients. If current waivered prescribers increase their number of patients so that those with a 30-patient limit treat 30 patients each and those with higher waivers treat half their waiver limit, adding "))) %>%
+  mutate(ub_2 = ifelse(newprov_capped3 == 0, "", newprov_capped3)) %>%
+  mutate(ub_3 = ifelse(newprov_capped3 == 0, "", ifelse(perc_gapfilled3 == 100, paste(" new waivered ", as.character(plural_ub), " would fill this projected treatment gap of ", treatgap_cap3, "  people, if new prescribers treat 30 patients each."),
+                                                                    paste(" new waivered ", as.character(plural_ub), "  would fill ")))) %>%
+  mutate(ub_4 = ifelse(perc_gapfilled3 != 100, paste0(as.character(perc_gapfilled3), "\\%"), "")) %>%
+  mutate(ub_5 = ifelse(perc_gapfilled3 != 100, paste(" of this projected treatment gap of ", treatgap_cap3, " people, if new prescribers treat 30 patients each."), ""))
+           
+#Special language for Alpine because there are no current prescribers
+if (countydata$county == "Alpine"){ 
+  countydata <- countydata %>%
+    mutate(lb_1 = "Adding ") %>%
+    mutate(lb_2 = "1") %>%
+    mutate(lb_3 = " new waivered prescriber fills the current treatment gap of 13 people, if the new prescriber treats 16 to 30 patients on average.") %>%
+    mutate(lb_4 = "") %>%
+    mutate(lb_5 = "") %>%
+    mutate(ub_1 = "") %>%
+    mutate(ub_2 = "") %>%
+    mutate(ub_3 = "") %>%
+    mutate(ub_4 = "") %>%
+    mutate(ub_5 = "")
+}
+
+
+
+
+```
+
+\urbnlogo
+
+\urbntitle{California Opioid Use Disorder and Treatment Needs}
+\textbf{\urbnsubtitle{`r countydata$county` County, 2019 Fact Sheet}}
+
+\begin{urbnbullets}
+\item \textbf{`r countydata$death_count`} opioid-related overdose {`r countydata$deathsingular`}{`r countydata$death1`}\textbf{`r countydata$death2`}{`r countydata$death3`}
+\item \textbf{`r countydata$buprx_count`} buprenorphine prescriptions{`r countydata$bup1`} \textbf{`r countydata$bup2`}{`r countydata$bup3`}
+\item \textbf{`r countydata$OTPcount`} {`r countydata$OTPsingular`}{`r countydata$OTP1`}\textbf{`r countydata$OTP2`}{`r countydata$OTP3`}\textbf{`r countydata$OTP4`}{`r countydata$OTP5`}
+\item \textbf{`r countydata$totbuppat_bypatcty`} county residents receive buprenorphine treatment; \textbf{`r countydata$buppatincty_bypatcty`} receive buprenorphine treatment from a prescriber in their county
+\end{urbnbullets}
+
+\vspace{-0.2cm}
+
+```{r horizontal-line,fig.width=7, fig.height=0.3, fig.fullwidth=TRUE}
+
+test <- tibble(
+  var1 = c(0, 1),
+  var2 = c(0, 1)
+)
+
+ggplot(test) +
+  geom_hline(yintercept = 1, color = "#1696D2", size = 1) +
+  theme_void()
+
+
+```
+\vspace{-0.6cm}
+
+\begin{center}
+\large{\urbnheadingtwo{Number of people with opioid use disorder (OUD) = \textbf{`r countydata$newOUDcount`}}}
+\end{center}
+
+\btwocol
+
+```{r boxplot, fig.width=7, fig.height=1.4, fig.fullwidth=TRUE}
+
+#change fig.height=1.5 if add label back in
+
+#subset data and turn into long
+#Create new variable with the label, which is either the specific county name, or "each grey dot..."
+# turn this variable into a factor variable for plotting
+OUDlong <- subset(data, select=c("county", "newOUDrate")) %>%
+  gather(key = measure, value = value, newOUDrate) %>%
+  mutate(countylab = ifelse(county == as.character(params$county), params$county, "Each dot \nrepresents a county")) %>%
+  mutate(countylab = factor(countylab, levels = c(params$county , "Each dot \nrepresents a county")))  %>%
+  mutate(value = round(value, digits = 1)) #this is for how many digits we use in the pie chart
+
+
+#save min and max of value. Do this before turning value into a factor
+minval <- min(OUDlong$value)
+maxval <- max(OUDlong$value)
+
+#Save value of OUD rate for this county and for all of California
+justcounty <- subset(OUDlong, county == as.character(params$county))
+OUDcounty = justcounty$value[1]
+OUDcounty_rounded = format(round(OUDcounty, digits=1), nsmall = 1)
+
+#Save the value of the OUD rate for the California mean
+CA <- subset(OUDlong, county == "California")
+OUDCA = CA$value[1]
+OUDCA_rounded = format(round(OUDCA, digits=1), nsmall = 1)
+
+#Create variable that is 1 for all the values equal to this county, 2 for the CA mean, and 0 for all else
+#Turn value into a factor
+OUDlong <- OUDlong %>%
+  mutate(sameOUDval = ifelse(value == OUDcounty, 1, ifelse(value == OUDCA, 2, 0))) %>%
+  mutate(value = as.factor(value)) %>%
+  #Counter variable for the number of occurances of this value
+  mutate(num = 1) %>%
+  arrange(value)
+  
+#create shell with all values from min to max, increasing by .01 increments
+shell <- data.frame(value = seq(minval, maxval, by=0.1)) %>% #change to .01 if use 2 digits
+  mutate(value = as.factor(value))
+
+#merge shell onto dataframe to create NA values for values between min and max without counties. Assign same factor values to both variables called value
+#We use right_join to fill in missing for values for variables for rows that appear in the right dataframe that aren't in the left df
+combined <- sort(union(levels(OUDlong$value), levels(shell$value)))
+
+toplot <- right_join(mutate(OUDlong, value=factor(value, levels=combined)),
+  mutate(shell, value = factor(value, levels=combined)), by = "value") %>%
+  arrange(value) %>%
+  mutate(value2 = factor(x = value, levels = value, labels = paste0(as.character(value), "%")))
+
+
+#Stacked barplot
+ggplot(toplot, aes(x=value2, y = num, fill = as.factor(sameOUDval))) +
+  geom_bar(stat="identity", width = .8) +
+  scale_y_continuous(minor_breaks = c(0, 5, 10, 15)) +
+  scale_x_discrete(breaks = c("1.5%", "2%", "2.5%"),
+                   labels = c("1.5%", "2%", "2.5%"),
+                   expand = expand_scale(mult = c(0.01, 0.01))) +
+  scale_fill_manual(values = c("#d2d2d2", "#1696d2", "#fdbf11")) +
+  labs(x = "OUD rate",
+       y = "# of \ncounties") +
+  theme(legend.position="none",
+        panel.background = element_blank(),
+        axis.ticks.x.bottom = element_line(),
+        axis.line = element_line(),
+        panel.grid.major.y = element_line(size = (0.2), colour="grey"),
+        panel.grid.minor.y = element_line(size = (0.2), colour="grey"),
+        axis.text = element_text(family = "Lato", size = 14),
+        axis.title = element_text(family = "Lato", size = 16),
+        axis.title.y = element_text(margin = margin(t = 0, r = 10, b = 0, l = 0))
+        )
+
+```
+
+\columnbreak
+
+\onehalfspacing
+
+\textbf{`r countydata$county` county} = \textcolor{urbnblue}{\textbf{`r OUDcounty_rounded`\%}} of residents 12+ \linebreak
+\textbf{Statewide average} = \textcolor{urbnyellow}{\textbf{`r OUDCA_rounded`\%}} of residents 12+
+
+\singlespacing
+
+\etwocol
+
+\vspace{-0.5cm}
+
+\btwocol
+\begin{center}
+\urbnheadingtwo{Prescribers, July 2019}
+\end{center}
+
+\begin{flushleft} 
+
+\setlength{\arrayrulewidth}{0mm}
+\renewcommand{\arraystretch}{1.6}
+\setlength{\tabcolsep}{0pt}
+
+\begin{tabular}[t]{ | >{\raggedleft}m{1.2cm}@{\hskip11pt} | >{\raggedright\arraybackslash}m{6.4cm}|} 
+\large{`r countydata$totalprescribers`} & total prescribers in the county; `r countydata$perc_waiver`\% have a buprenorphine waiver \\
+\large{\textcolor{urbnblue}{`r countydata$NTISwaiver30`}} & buprenorphine-waivered `r countydata$singular30` with a 30-patient limit (`r countydata$newwaiver30` from Feb. 2018) \\
+\large{\textcolor{urbnblue}{`r countydata$NTISwaiver100`}} & buprenorphine-waivered `r countydata$singular100` with a 100-patient limit (`r countydata$newwaiver100` from Feb. 2018) \\
+\large{\textcolor{urbnblue}{`r countydata$NTISwaiver275`}} & buprenorphine-waivered `r countydata$singular275` with a 275-patient limit (`r countydata$newwaiver275` from Feb. 2018) \\
+\large{`r countydata$prov_outofcounty`} & out-of-county buprenorphine `r countydata$singularOOC` prescribe to county residents \\
+\end{tabular}
+\end{flushleft}
+
+\columnbreak
+
+\begin{center}
+\urbnheadingtwo{Patients with and without access to treatment}
+\end{center}
+
+\vspace{-0.25cm}
+\begin{center}
+\btwocol
+\footnotesize{Current} \vfill\null
+\columnbreak
+\footnotesize{Projection if current prescribers treat more patients*} 
+\etwocol 
+\end{center} 
+\vspace{-0.5cm}
+```{r Pie-charts, fig.height=3.0 }
+
+#If group_by doesn't work, run the below line
+#detach(package:plyr)
+
+data_long2 <- countydata %>%
+  #current all bupe - any bupe (in or out of county) + bupe OTP patients
+  mutate(curbup = totbuppat_bypatcty + bupotp_patients) %>%
+  #projected all bpe - bupe capacity if prescribers treat more, bupe OTP patients, patients receiving bupe only out of county (don't have both an in-county and OOC prescriber)
+  mutate(projbup = treatcap3bup + bupotp_patients + buppatonlyoutcty_bypatcty) %>%
+  subset(select = c("curbup", "methadone_patients", "curtreatgap_all", "projbup", "Totalslots", "treatgap_cap3")) %>%
+  mutate(curbup = as.numeric(curbup)) %>%
+  mutate(projbup = as.numeric(projbup)) %>%
+  mutate(treatgap_cap3 = as.numeric(treatgap_cap3)) %>%
+  gather(key = group, value = value) %>%
+  mutate(percent = value/sum(value)) %>%
+  mutate(value = comma(value, digits = 0)) %>%
+  mutate(labs = as.ordered(ifelse(group == "curbup" | group == "projbup", "Buprenorphine patients", ifelse(group == "curtreatgap_all" | group == "treatgap_cap3", "Patients without access to treatment", "Methadone patients")))) %>%
+  #change order if we put the legend on 2 rows
+  #mutate(labs = fct_relevel(labs, c("Buprenorphine patients", "Patients without access to treatment", "Methadone patients"))) %>%
+mutate(treatlim = as.factor(ifelse(group == "curbup" | group == "methadone_patients" | group == "curtreatgap_all", "Current patients \nreceiving treatment", "Projected patients \nreceiving treatment"))) %>%
+  group_by(treatlim) %>%
+  mutate(percent = value/sum(value)) %>%
+  #xvar is where the label will be plotted. If there is only one pie slice, use xvar=1 to put the label in the center of the plot 
+  mutate(xvar = ifelse(percent == 1, .5, 1)) %>%
+  #Move the label for the methadone slice up
+  #mutate(xvar = ifelse(labs == "Methadone patients", 1.1 ,xvar)) %>%
+  #take out any zero values so that the label is not plotted
+  filter(value != 0)
+
+
+ggplot(data = data_long2, aes(x = "", y = percent, fill = labs)) + 
+  geom_bar(width = 1, stat = "identity") +
+  facet_grid(facets=.~ treatlim) +
+  coord_polar(theta = "y") +
+  geom_text_repel(aes(x = xvar, y = percent, label = value), 
+                  position = position_stack(vjust = 0.5), 
+                  size = 5) +
+  scale_fill_manual(values = c("Buprenorphine patients" = "#1696d2", 
+                               "Methadone patients" = "#a2d4ec",
+                              "Patients without access to treatment" = "#fdbf11")) +
+  labs(x = NULL,
+       y = NULL) +
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.line = element_blank(),
+        legend.position="bottom",
+        legend.direction = "horizontal",
+        legend.background = element_blank(),
+        legend.title = element_blank(),
+        legend.text = element_text(size=15),
+        legend.justification = "center",
+        legend.key.size = unit(0.6, "cm"),
+        legend.box.spacing = unit(.1, 'cm'), #spacing from chart
+        #legend.key.height=unit(2,"line"),
+        plot.margin=unit(c(0,0,0,0),"cm"),
+        panel.background = element_blank(),
+        panel.grid  = element_blank(),
+        panel.spacing.x = unit(5, "lines"), #how far apart pie charts are
+        strip.background = element_blank(),
+        strip.text = element_blank(), #change to put facet label in  element_text(size = 16),
+        text = element_text(family = "Lato")
+        ) +
+  guides(fill = guide_legend(ncol = 1))
+
+```
+
+\footnotesize{\textbf{*}Projection if 30-waiver buprenorphine prescribers treat 30 patients, those with higher waivers treat half their limit, and all methadone treatment slots are filled.}
+\etwocol
+\vspace{-0.4cm}
+```{r horizontal-line 2,fig.width=7, fig.height=0.3, fig.fullwidth=TRUE}
+
+test <- tibble(
+  var1 = c(0, 1),
+  var2 = c(0, 1)
+)
+
+ggplot(test) +
+  geom_hline(yintercept = 1, color = "#1696D2", size = 1) +
+  theme_void()
+```
+\vspace{-0.5cm}
+\urbnheadingtwo{Strategies to Meet Demand for Treatment}
+
+\begin{urbnbullets}
+\item \textbf{\textcolor{urbnblue}{Increase prescribers:}} `r countydata$lb_1`\textbf{`r countydata$lb_2`}`r countydata$lb_3`\textbf{`r countydata$lb_4`}`r countydata$lb_5` `r countydata$ub_1`\textbf{`r countydata$ub_2`}`r countydata$ub_3`\textbf{`r countydata$ub_4`}`r countydata$ub_5` \linebreak
+\item \textbf{\textcolor{urbnblue}{Promising strategies:}} Work with health plans for prescriber outreach; add medication-assisted treatment (MAT) in health centers, jails, emergency departments, hospitals, maternity practices, and existing addiction treatment programs; market MAT telehealth to the public; work with OTPs to add med units and spokes; work with county alcohol and drug departments to coordinate services; expand MAT services through the Drug Medi-Cal waiver; engage local opioid safety coalition.
+\end{urbnbullets}
+
+\contactinfo{}
+
+\newpage{}
+\newgeometry{left=1in,right=1in,top=1in,bottom=1.5in}
+
+\urbnheadingone{Summary of Methods} See the methodological appendix for more details. \linebreak \linebreak 
+\urbnheadingtwoleft{Data sources.} Estimates of opioid overdose deaths and buprenorphine prescriptions are from the [California Opioid Overdose Surveillance Dashboard](https://discovery.cdph.ca.gov/CDIC/ODdash/). Opioid treatment program (OTP) patient and slot counts from 2019 were obtained through a California Public Records Act data request. Buprenorphine prescriber counts are drawn from the Drug Enforcement Administration Active Controlled Substances Act Registrants Database, which includes all Drug Addiction Treatment Act–waived buprenorphine prescribers. Counts of patients being treated with buprenorphine are drawn from the California Controlled Substance Utilization Review and Evaluation System (CURES) prescription drug monitoring database.
+
+\urbnheadingtwoleft{Opioid use disorder (OUD) estimates.} To estimate county OUD rates, we took the average of two substate estimates derived from the NSDUH and used regression models to allocate the counts across counties, as a function of observed variables that have an empirical relationship with OUD. For the first substate estimate, we started with past-year nonmedical use of prescription pain relievers for 26 substate regions in California from the National Survey on Drug Use and Health (2012-14 NSDUH). To estimate substate OUD rates, we adjusted the estimates of nonmedical use for recent trends and applied the share of prescription pain reliever OUD among those who misuse prescription pain relievers in California, as well as the share of those with heroin use disorder but no prescription pain reliever OUD. For the second substate estimates, we multiplied those estimated 2017 California substate estimates from the NSDUH by a ratio representing the relationship between an NSDUH-based OUD rate, known to be biased downwards, and an OUD rate for Massachusetts based on a capture-recapture analysis of seven administrative databases linked at the person level (Barocas et al. 2018). This ratio was computed as the ratio of the estimated OUD rate in Massachusetts in 2015 to the estimated 2015 rate from the NSDUH. We used the 2015 OUD rates from the Massachusetts study because fentanyl-related opioid deaths and the relationship between 2015 deaths and OUD rates in Massachusetts are similar to those in California in 2017.
+
+\urbnheadingtwoleft{Treatment capacity and gap estimates.} We calculated lower- and upper-bound estimates of buprenorphine and methadone treatment capacity in each county. The lower-bound estimate was the number of patients currently receiving any buprenorphine treatment during the year (including patients who receive treatment out of county), based on CURES data, plus the number of current methadone and buprenorphine patients at OTPs, based on state data. The upper-bound estimate was based on projected increases in patient counts for in-county buprenorphine prescribers from the current annual average of 16 unique in-county patients per year per prescriber, based on CURES data, to 30 patients for 30-waivered prescribers and 50 and 137 patients for 100- and 275-waivered prescribers, respectively. The upper-bound estimate also includes total methadone slots and buprenorphine patients at OTPs in the county. No change was made to the number of buprenorphine patients who receive treatment out of county. To compute the treatment gap, or the number of people with OUD who do not have access to buprenorphine or methadone medication for addiction treatment (MAT) in their county, we assumed all people with OUD seek MAT. We calculated the treatment gap by subtracting the lower- and upper-bound treatment capacity estimates in each county from the estimated number of people with OUD in each county.
+
+\urbnheadingtwoleft{Strategies to meet demand for treatment.} We computed the estimated number of additional 30-waivered buprenorphine prescribers per county necessary to achieve the capacity to fill the estimated treatment gap. We show a range using the lower- and upper-bound estimates of the treatment gap and the treatment capacity, assuming new prescribers treat an average of 16 patients for the lower estimate and an average of 30 patients for the upper estimate. When the number of new buprenorphine prescribers needed is more than double the current number of prescribers, we present the goal of doubling the number of prescribers, and the percentage of the treatment gap that would be filled. 
+
+\urbnheadingtwoleft{Authors.} Lisa Clemans-Cope, Marni Epstein, Douglas Wissoker, Joshua Aarons. Corresponding author: Lisa Clemans-Cope, lclemans@urban.org. This fact sheets is an update to a previous version published in 2018.
+
+\vspace{-0.6cm}
+
+\urbnboilerplate{the California Health Care Foundation}{October}{2019}
